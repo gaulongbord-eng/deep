@@ -85,7 +85,7 @@ class Camera2Controller(
         val focal = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
             ?.firstOrNull() ?: 0f
         val ois = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
-            ?.contains(CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_ON) == true
+    ?.contains(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON) == true
         val name = when {
             focal < 3.5f -> "0.6x"
             focal < 5.5f -> "1x"
@@ -160,7 +160,7 @@ class Camera2Controller(
 
             if (lens.hasOis) {
                 builder.set(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-                    CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_ON)
+    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON)
             }
             if (isProMode) {
                 builder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
