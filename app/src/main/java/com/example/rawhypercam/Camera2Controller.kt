@@ -150,41 +150,56 @@ class Camera2Controller(
     }
 
     private fun sendPreviewRequest() {
-        val device = cameraDevice ?: return
-        val session = captureSession ?: return
-        val surface = previewSurface ?: return
-        val lens = currentLens ?: return
-        try {
-            val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-            builder.addTarget(surface)
+    val device = cameraDevice ?: return
+    val session = captureSession ?: return
+    val surface = previewSurface ?: return
+    val lens = currentLens ?: return
+    try {
+        val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+        builder.addTarget(surface)
 
-            if (lens.hasOis) {
-                builder.set(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON)
-            }
-            if (isProMode) {
-                builder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
-                builder.set(CaptureRequest.SENSOR_SENSITIVITY, iso)
-                builder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, exposureTimeNs)
-                builder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF)
-                if (focusDistance > 0f) {
-                    builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focusDistance)
-                }
-            } else {
-                builder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON)
-                builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, evCompensation)
-                builder.set(CaptureRequest.CONTROL_AF_MODE,
-                    CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
-            }
-            builder.set(CaptureRequest.CONTROL_AE_METERING_MODE,
-                CameraMetadata.CONTROL_AE_METERING_MODE_CENTER_WEIGHTED)
-
-            currentRequestBuilder = builder
-            session.setRepeatingRequest(builder.build(), null, backgroundHandler)
-        } catch (e: Exception) {
-            onError("Preview request failed: ${e.message}")
+        if (lens.hasOis) {
+            builder.set(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+                CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON)
         }
+        if (isProMode) {
+            builder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
+            builder.set(CaptureRequest.SENSOR_SENSITIVITY, iso)
+            builder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, exposureTimeNs)
+            builder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF)
+            if (focusDistance > 0f) {
+                builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focusDistance)
+            }
+        } else {
+            builder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON)
+            builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, evCompensation)
+            builder.set(CaptureRequest.CONTROL_AF_MODE,
+                CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+        }
+
+        // ✅ Центровзвешенный замер через CONTROL_AE_REGIONS
+        val chars = cameraManager.getCameraCharacteristics(lens.id)
+        val activeArray = chars.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+        if (activeArray != null) {
+            val centerX = activeArray.width() / 2
+            val centerY = activeArray.height() / 2
+            val radius = (activeArray.width() * 0.15f).toInt()
+            val centerRect = MeteringRectangle(
+                (centerX - radius).coerceAtLeast(0),
+                (centerY - radius).coerceAtLeast(0),
+                (radius * 2).coerceAtMost(activeArray.width()),
+                (radius * 2).coerceAtMost(activeArray.height()),
+                MeteringRectangle.METERING_WEIGHT_MAX
+            )
+            builder.set(CaptureRequest.CONTROL_AE_REGIONS, arrayOf(centerRect))
+        }
+
+        currentRequestBuilder = builder
+        session.setRepeatingRequest(builder.build(), null, backgroundHandler)
+    } catch (e: Exception) {
+        onError("Preview request failed: ${e.message}")
     }
+}
 
     fun tapToFocus(x: Float, y: Float, viewW: Int, viewH: Int) {
         val builder = currentRequestBuilder ?: return
